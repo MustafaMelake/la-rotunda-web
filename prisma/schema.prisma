@@ -1,13 +1,27 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// La Rotunda — data model.
+//
+// PostgreSQL, relational. Model the menu as Product -> ProductVariant
+// (Small / Medium / Large pizza, 2pc / 4pc / 8pc chicken):
+//   · Prices live ONLY on ProductVariant — Product has no price column.
+//   · Every currency column is Decimal (a VAT *rate* is Float).
+//   · OrderItem snapshots productName / variantName / unitPrice at purchase,
+//     so order history never joins back to the live catalog.
+//   · ProductVariant -> OrderItem is onDelete: Restrict — an ever-ordered
+//     variant is archived (isAvailable: false), never hard-deleted.
 
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  // NOTE: Prisma 7 removed `url` from the datasource block. The connection is
+  // supplied in two places instead, and that split is intentional:
+  //   · CLI (migrate/studio) -> datasource.url in prisma.config.ts (DIRECT_URL)
+  //   · runtime              -> the PrismaPg adapter in src/lib/prisma.ts
 }
+
+// TODO(la-rotunda): add models — User, Session, Account, Verification (Better
+// Auth), Category, Product, ProductVariant, Promotion, Order, OrderItem,
+// CartItem, Branch, StoreSettings. Then: npx prisma migrate dev --name init
