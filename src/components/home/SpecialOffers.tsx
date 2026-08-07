@@ -49,11 +49,17 @@ const OFFERS: readonly Offer[] = [
   },
 ] as const;
 
-export function SpecialOffers() {
+/**
+ * `className` exists for reuse across pages: this section ships with bottom
+ * padding only, because on the homepage the Categories band above it supplies
+ * the top gap. Any page that mounts it directly under a hero must pass its own
+ * `pt-*` or the banners collide with whatever precedes them.
+ */
+export function SpecialOffers({ className }: { className?: string }) {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section className="bg-background pb-20 sm:pb-28">
+    <section className={cn("bg-background pb-20 sm:pb-28", className)}>
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <SectionHeading label="Special Offers" title="Delicious deals you can't miss">
           Live offers, applied automatically at checkout. When one ends, the

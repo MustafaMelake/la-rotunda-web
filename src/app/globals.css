@@ -314,6 +314,22 @@
     );
   }
 
+  /* Feathers a rectangular photo into a flat brand ground, so an opaque stock
+     image reads as a cut-out without needing a transparent PNG. Used by the
+     menu hero. Declared here to keep the mask off the markup. */
+  .feather-mask {
+    -webkit-mask-image: radial-gradient(
+      ellipse 72% 72% at 50% 50%,
+      #000 52%,
+      transparent 100%
+    );
+    mask-image: radial-gradient(
+      ellipse 72% 72% at 50% 50%,
+      #000 52%,
+      transparent 100%
+    );
+  }
+
   .scrollbar-none {
     scrollbar-width: none;
   }
