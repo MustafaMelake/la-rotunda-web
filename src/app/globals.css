@@ -1,8 +1,323 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-/* Tailwind v4 is token-driven — declare the design system here, not in a
-   tailwind.config.js (v4 has none). Pick La Rotunda's palette and stick to it. */
-@theme {
-  --color-primary: oklch(0.62 0.17 32);
-  --font-serif: ui-serif, Georgia, serif;
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   LA ROTUNDA — BRAND TOKENS
+   Red pulled from the storefront signage / bucket lockup.
+   ============================================================ */
+:root {
+  /* La Rotunda Red — #E01A18 (signage), warm scarlet, high chroma */
+  --brand-red: oklch(0.5624 0.2243 27.28);
+  --brand-red-hover: oklch(0.5124 0.21 27.28);
+  --brand-red-soft: oklch(0.952 0.032 27.28);
+  --brand-black: oklch(0.1448 0 0);
+  --brand-white: oklch(1 0 0);
+
+  --radius: 0.75rem;
+
+  /* Total vertical space the fixed navbar occupies: pill height (4rem) + the
+     top offset it floats on (1rem). The (shop) layout is the ONLY consumer for
+     clearance; full-bleed sections opt out via `.bleed-under-nav`. Change the
+     number here and both stay in sync. */
+  --nav-h: 5rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.1448 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.1448 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.1448 0 0);
+
+  --primary: var(--brand-red);
+  --primary-foreground: oklch(1 0 0);
+
+  --secondary: oklch(0.1448 0 0);
+  --secondary-foreground: oklch(1 0 0);
+
+  --muted: oklch(0.9702 0 0);
+  --muted-foreground: oklch(0.4386 0 0);
+
+  --accent: var(--brand-red-soft);
+  --accent-foreground: var(--brand-red);
+
+  --destructive: oklch(0.5054 0.1905 27.52);
+  --destructive-foreground: oklch(1 0 0);
+
+  --border: oklch(0.9022 0 0);
+  --input: oklch(0.9022 0 0);
+  --ring: var(--brand-red);
+
+  --chart-1: var(--brand-red);
+  --chart-2: oklch(0.68 0.165 42);
+  --chart-3: oklch(0.79 0.14 78);
+  --chart-4: oklch(0.32 0 0);
+  --chart-5: oklch(0.63 0 0);
+
+  --sidebar: oklch(0.1448 0 0);
+  --sidebar-foreground: oklch(0.9702 0 0);
+  --sidebar-primary: var(--brand-red);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.22 0 0);
+  --sidebar-accent-foreground: oklch(0.9702 0 0);
+  --sidebar-border: oklch(0.26 0 0);
+  --sidebar-ring: var(--brand-red);
+}
+
+.dark {
+  /* Interior vibe: near-black room, red as the only light source */
+  --background: oklch(0.1211 0 0);
+  --foreground: oklch(0.9851 0 0);
+  --card: oklch(0.177 0 0);
+  --card-foreground: oklch(0.9851 0 0);
+  --popover: oklch(0.177 0 0);
+  --popover-foreground: oklch(0.9851 0 0);
+
+  /* Lifted slightly so it holds contrast against near-black */
+  --primary: oklch(0.615 0.218 27.28);
+  --primary-foreground: oklch(1 0 0);
+
+  --secondary: oklch(0.2393 0 0);
+  --secondary-foreground: oklch(0.9851 0 0);
+
+  --muted: oklch(0.2393 0 0);
+  --muted-foreground: oklch(0.7155 0 0);
+
+  --accent: oklch(0.27 0.048 27.28);
+  --accent-foreground: oklch(0.82 0.12 27.28);
+
+  --destructive: oklch(0.615 0.218 27.28);
+  --destructive-foreground: oklch(1 0 0);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.615 0.218 27.28);
+
+  --chart-1: oklch(0.615 0.218 27.28);
+  --chart-2: oklch(0.72 0.165 42);
+  --chart-3: oklch(0.83 0.14 78);
+  --chart-4: oklch(0.9 0 0);
+  --chart-5: oklch(0.56 0 0);
+
+  --sidebar: oklch(0.177 0 0);
+  --sidebar-foreground: oklch(0.9851 0 0);
+  --sidebar-primary: oklch(0.615 0.218 27.28);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.27 0 0);
+  --sidebar-accent-foreground: oklch(0.9851 0 0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.615 0.218 27.28);
+}
+
+/* ============================================================
+   THEME MAPPING — exposes tokens as Tailwind utilities
+   ============================================================ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Brand escape hatches: bg-brand, text-brand-red, etc. */
+  --color-brand-red: var(--brand-red);
+  --color-brand-red-hover: var(--brand-red-hover);
+  --color-brand-black: var(--brand-black);
+  --color-brand-white: var(--brand-white);
+
+  --font-sans: var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-anton), var(--font-cairo), sans-serif;
+  --font-script: var(--font-pacifico), cursive;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Drives the shadcn Accordion open/close transition. `tw-animate-css` covers
+     enter/exit fades but ships no accordion keyframes, so they live below. */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* Arabic runs heavier and sits lower — give it room. */
+  [lang="ar"],
+  [dir="rtl"] {
+    line-height: 1.85;
+    letter-spacing: 0;
+  }
+}
+
+/* ============================================================
+   BRAND UTILITIES
+   ============================================================ */
+@layer utilities {
+  /* The signage lockup — cursive, tight, slightly optically raised. */
+  .font-logo {
+    font-family: var(--font-script);
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+  }
+
+  /* Promo/menu headings: condensed uppercase, KFC-adjacent shout. */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+
+  /* Every runtime-mutable number: prices, quantities, totals. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Red price/discount flag, as on the bucket creative. */
+  .brand-flag {
+    background-color: var(--brand-red);
+    color: var(--brand-white);
+    border-radius: 9999px;
+    padding: 0.125rem 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  /* Backlit-sign glow — for the hero logo on dark only. */
+  .brand-glow {
+    text-shadow: 0 0 18px color-mix(in oklch, var(--brand-red) 55%, transparent),
+      0 0 48px color-mix(in oklch, var(--brand-red) 25%, transparent);
+  }
+
+  /* Red corrugated-panel band, echoing the order counter. */
+  .brand-panel {
+    background-color: var(--brand-red);
+    background-image: repeating-linear-gradient(
+      90deg,
+      color-mix(in oklch, #000 8%, transparent) 0 1px,
+      transparent 1px 14px
+    );
+  }
+
+  /* The ONLY sanctioned way to defeat the layout's navbar clearance. A
+     full-bleed section cancels the offset, then re-adds it as padding so the
+     artwork reaches y=0 while the copy still clears the navbar. Never scatter
+     raw `-mt-20` for this — the layout owns the number, this borrows it. */
+  .bleed-under-nav {
+    margin-top: calc(var(--nav-h) * -1);
+    padding-top: var(--nav-h);
+  }
+
+  /* Hard offset shadow in brand red — the 3D letters mounted on the tile wall
+     in the storefront signage. Sized in `em` so it tracks the font-size across
+     breakpoints instead of going slab-thick on mobile. */
+  .sign-shadow {
+    text-shadow: 0.055em 0.055em 0 var(--brand-red),
+      0.09em 0.11em 0.5em rgb(0 0 0 / 0.5);
+  }
+
+  /* Sunburst rays behind the pre-footer CTA. A repeating conic gradient beats
+     an SVG fan here: it stays centred and crisp at any viewport without
+     recomputing geometry. The radial mask keeps the rays off the headline and
+     fades them out before the edges. */
+  .sunburst {
+    background-image: repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      rgb(255 255 255 / 0.07) 0deg 2.5deg,
+      transparent 2.5deg 13deg
+    );
+    -webkit-mask-image: radial-gradient(
+      ellipse at 50% 50%,
+      transparent 0%,
+      #000 30%,
+      #000 66%,
+      transparent 92%
+    );
+    mask-image: radial-gradient(
+      ellipse at 50% 50%,
+      transparent 0%,
+      #000 30%,
+      #000 66%,
+      transparent 92%
+    );
+  }
+
+  /* Soft top-left highlight that stops the black offer banner reading as a
+     flat fill. Declared here rather than as an inline
+     `bg-[radial-gradient(...,rgba(...),...)]` so the colour literal stays out
+     of the markup and out of Tailwind's arbitrary-value parser. */
+  .corner-sheen {
+    background-image: radial-gradient(
+      120% 90% at 15% 0%,
+      rgb(255 255 255 / 0.14),
+      transparent 60%
+    );
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
