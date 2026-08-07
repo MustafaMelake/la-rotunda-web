@@ -2,7 +2,7 @@
 # =============================================================================
 #  setup-la-rotunda.sh — bootstrap the "La Rotunda" restaurant e-commerce app
 #
-#  Replicates the Ali Baba platform's infrastructure: Next.js 16.2 App Router
+#  Replicates the La Rotunda platform's infrastructure: Next.js 16.2 App Router
 #  (RSC-first), React 19.2, Prisma 7 + @prisma/adapter-pg over PostgreSQL,
 #  Tailwind CSS v4, Better Auth 1.6, Zustand 5 (cart only), plus the .claude/
 #  AI-governance tree and the typecheck/lint/test verification gate.

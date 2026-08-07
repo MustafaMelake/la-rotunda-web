@@ -17,4 +17,126 @@ import * as Prisma from './internal/prismaNamespaceBrowser'
 export { Prisma }
 export * as $Enums from './enums'
 export * from './enums';
-
+/**
+ * Model User
+ * 
+ */
+export type User = Prisma.UserModel
+/**
+ * Model Session
+ * 
+ */
+export type Session = Prisma.SessionModel
+/**
+ * Model Account
+ * 
+ */
+export type Account = Prisma.AccountModel
+/**
+ * Model Verification
+ * 
+ */
+export type Verification = Prisma.VerificationModel
+/**
+ * Model Branch
+ * 
+ */
+export type Branch = Prisma.BranchModel
+/**
+ * Model Category
+ * 
+ */
+export type Category = Prisma.CategoryModel
+/**
+ * Model Product
+ * 
+ */
+export type Product = Prisma.ProductModel
+/**
+ * Model ProductVariant
+ * 
+ */
+export type ProductVariant = Prisma.ProductVariantModel
+/**
+ * Model ModifierGroup
+ * 
+ */
+export type ModifierGroup = Prisma.ModifierGroupModel
+/**
+ * Model ModifierOption
+ * 
+ */
+export type ModifierOption = Prisma.ModifierOptionModel
+/**
+ * Model Review
+ * 
+ */
+export type Review = Prisma.ReviewModel
+/**
+ * Model CartItem
+ * 
+ */
+export type CartItem = Prisma.CartItemModel
+/**
+ * Model CartItemModifier
+ * A single option selected on a cart line. Carries NO snapshot — the cart is
+ * ephemeral and getDbCartAction re-resolves name/price on every read.
+ */
+export type CartItemModifier = Prisma.CartItemModifierModel
+/**
+ * Model Order
+ * 
+ */
+export type Order = Prisma.OrderModel
+/**
+ * Model OrderItem
+ * 
+ */
+export type OrderItem = Prisma.OrderItemModel
+/**
+ * Model OrderItemModifier
+ * A single option selected on a placed order line, SNAPSHOTTED.
+ * 
+ * The FK is SetNull while ProductVariant → OrderItem is Restrict, and that
+ * asymmetry is deliberate: a restaurant retires "Extra Jalapeños" seasonally,
+ * and Restrict would make every ever-ordered option permanently undeletable.
+ * Because name + priceDelta are snapshotted here, the FK is not load-bearing
+ * for rendering — nulling it costs nothing a receipt can observe. The variant
+ * FK keeps Restrict because analytics rollups still read it.
+ */
+export type OrderItemModifier = Prisma.OrderItemModifierModel
+/**
+ * Model MenuCategory
+ * 
+ */
+export type MenuCategory = Prisma.MenuCategoryModel
+/**
+ * Model MenuItem
+ * 
+ */
+export type MenuItem = Prisma.MenuItemModel
+/**
+ * Model Promotion
+ * 
+ */
+export type Promotion = Prisma.PromotionModel
+/**
+ * Model StoreSettings
+ * 
+ */
+export type StoreSettings = Prisma.StoreSettingsModel
+/**
+ * Model Faq
+ * 
+ */
+export type Faq = Prisma.FaqModel
+/**
+ * Model Location
+ * 
+ */
+export type Location = Prisma.LocationModel
+/**
+ * Model FooterLink
+ * 
+ */
+export type FooterLink = Prisma.FooterLinkModel

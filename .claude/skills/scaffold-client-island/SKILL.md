@@ -1,6 +1,6 @@
 ---
 name: scaffold-client-island
-description: Scaffold a thin "use client" interactive island for the Ali Baba storefront/admin — a Server Action wired through useTransition with optimistic local state, sonner toasts, and rollback on failure. Use when adding an interactive leaf (buttons, forms, toggles, status controls) to an otherwise server-rendered tree.
+description: Scaffold a thin "use client" interactive island for the La Rotunda storefront/admin — a Server Action wired through useTransition with optimistic local state, sonner toasts, and rollback on failure. Use when adding an interactive leaf (buttons, forms, toggles, status controls) to an otherwise server-rendered tree.
 ---
 
 # Scaffold a Client Island

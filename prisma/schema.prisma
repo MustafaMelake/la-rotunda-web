@@ -1,27 +1,751 @@
-// La Rotunda — data model.
+// ─────────────────────────────────────────────────────────────────────────────
+// La Rotunda — restaurant e-commerce platform
+//   Online ordering (pizza · fried chicken · sides) + a dine-in digital menu.
 //
-// PostgreSQL, relational. Model the menu as Product -> ProductVariant
-// (Small / Medium / Large pizza, 2pc / 4pc / 8pc chicken):
-//   · Prices live ONLY on ProductVariant — Product has no price column.
-//   · Every currency column is Decimal (a VAT *rate* is Float).
-//   · OrderItem snapshots productName / variantName / unitPrice at purchase,
-//     so order history never joins back to the live catalog.
-//   · ProductVariant -> OrderItem is onDelete: Restrict — an ever-ordered
-//     variant is archived (isAvailable: false), never hard-deleted.
+// Datasource: PostgreSQL (Neon). Connection URL is supplied by prisma.config.ts
+//            for the CLI, and by the PrismaPg adapter in src/lib/prisma.ts at
+//            runtime. Prisma 7 removed `url` from the datasource block.
+// Client:    `prisma-client` generator emitting to src/generated/prisma,
+//            consumed via `@/generated/prisma/client` and `@/generated/prisma/enums`.
+// Auth:      Better Auth standard models (User, Session, Account, Verification).
+//
+// Cardinal rules (see .claude/rules/database.md):
+//   · Prices live ONLY on ProductVariant, plus signed ModifierOption.priceDelta.
+//   · Every currency column is Decimal. The VAT *rate* is Float (a fraction).
+//   · Order rows are SNAPSHOTS — never join a placed order to the live catalog.
+//   · A cart line is identified by (variantId, modifierSignature), not variantId.
+// ─────────────────────────────────────────────────────────────────────────────
+
+datasource db {
+  provider = "postgresql"
+}
 
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
-datasource db {
-  provider = "postgresql"
-  // NOTE: Prisma 7 removed `url` from the datasource block. The connection is
-  // supplied in two places instead, and that split is intentional:
-  //   · CLI (migrate/studio) -> datasource.url in prisma.config.ts (DIRECT_URL)
-  //   · runtime              -> the PrismaPg adapter in src/lib/prisma.ts
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+  MANAGER // Branch Manager — scoped to a single Branch via User.branchId.
 }
 
-// TODO(la-rotunda): add models — User, Session, Account, Verification (Better
-// Auth), Category, Product, ProductVariant, Promotion, Order, OrderItem,
-// CartItem, Branch, StoreSettings. Then: npx prisma migrate dev --name init
+enum FulfillmentMethod {
+  DELIVERY
+  PICKUP
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+/// How a Promotion's `value` is applied to a price.
+enum DiscountType {
+  PERCENTAGE // `value` is a percent off (e.g. 15 → 15% off)
+  FIXED_AMOUNT // `value` is an absolute amount off (EGP)
+}
+
+// NOTE: the legacy `DeliveryLocation` enum (six hardcoded Menoufia towns) and
+// `Order.deliveryCity` are DELETED. Delivery areas are the live `Branch` table,
+// so adding or renaming one is an admin edit, not a schema migration. The enum
+// existed in the previous platform purely to render pre-branch legacy orders;
+// La Rotunda starts with an empty database, so there is nothing to preserve.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Better Auth — standard models
+// Field names & types must match what Better Auth's prismaAdapter expects.
+// NOTE: credential passwords are stored on Account.password (NOT on User).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  role          UserRole @default(USER)
+
+  // Branch assignment.
+  // OPTIONAL at the schema level by necessity: USER/ADMIN have no branch.
+  // The rule "a MANAGER must have a branchId" is conditional and CANNOT be
+  // expressed in Prisma — enforce it in app logic (updateUserRole on write,
+  // requireDashboardAccess on read).
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  // Auth relations
+  sessions Session[]
+  accounts Account[]
+
+  // Business relations
+  orders    Order[]
+  reviews   Review[]
+  cartItems CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Branches (physical restaurant locations)
+//
+// A Branch wears five hats: pickup point, delivery area, per-branch delivery-fee
+// source, opening-hours owner, and the unit of MANAGER RBAC.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Branch {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  /// URL-safe identifier (mirrors Category.slug), e.g. "downtown".
+  slug     String  @unique
+  address  String?
+  phone    String?
+  /// Soft on/off switch for the location without deleting it.
+  isActive Boolean @default(true)
+
+  /// Flat delivery fee (EGP) charged when this branch fulfils a DELIVERY order.
+  /// Orders with no branch ("Other Areas") use StoreSettings.defaultDeliveryFee.
+  deliveryFee Decimal @default(35)
+
+  // ── Operational hours ──────────────────────────────────────────────────────
+  // "HH:mm" 24-hour strings in Africa/Cairo. Kept as strings (not Int minutes)
+  // so they stay readable in Prisma Studio and in the admin form; parsed once in
+  // a shared helper.
+  //
+  // OVERNIGHT WRAP: a kitchen closing at 03:00 has closeTime < openTime. The
+  // open test is therefore `now >= open || now < close` — NOT the naive
+  // `open <= now && now < close`, which reports "closed" all night. Write it
+  // once, with a test for both shapes. See .claude/rules/business-logic.md.
+  openTime  String @default("11:00")
+  closeTime String @default("03:00")
+
+  /// Manual kill switch — "we're slammed, stop the queue" — independent of the
+  /// clock. Checked by placeOrder alongside the hours window.
+  isAcceptingOrders Boolean @default(true)
+
+  /// Users assigned to this branch (typically role == MANAGER).
+  managers User[]
+
+  /// Orders fulfilled by this branch (see Order.branchId).
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Menu catalogue (the orderable products)
+//
+//   Category  → classification            (Pizza, Fried Chicken, Sides, Drinks)
+//   Product   → belongs to a Category     (Margherita, Crispy Bucket)
+//   Variant   → the purchasable unit      (Small / Medium / Large, 4pc / 8pc)
+//   Modifier  → per-line customization    (Stuffed Crust +30, Extra Cheese +15)
+//
+// Prices live ONLY on ProductVariant; carts & orders reference a variant id so
+// the price is always resolved server-side (no client-supplied prices).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Category {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  // ── CategorySlider presentation fields ─────────────────────────────────────
+  /// Short marketing tagline shown under the title in the slider card.
+  subtitle String?
+  /// Hero image URL (or /public path) for the slider card.
+  image    String?
+
+  /// When true, this category is surfaced in the homepage CategorySlider.
+  /// Any number of categories may be featured.
+  isFeatured  Boolean @default(false)
+  /// Ascending display position within the slider (lower = earlier).
+  sliderOrder Int     @default(0)
+
+  products Product[]
+
+  /// Promotions targeting this whole category (Discount Engine).
+  promotions Promotion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Matches the storefront slider read: where isFeatured, ordered by sliderOrder.
+  @@index([isFeatured, sliderOrder])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  /// URL-safe identifier used for product detail routing (/product/[slug]).
+  /// Minted once at creation and NEVER regenerated on rename, so links survive.
+  slug        String   @unique
+  description String?
+  images      String[]
+  isAvailable Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+
+  // Classification
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  variants ProductVariant[]
+  reviews  Review[]
+
+  /// Per-line customization offered on this product (see ModifierGroup).
+  /// Attached at the PRODUCT level: "Choose your Crust" belongs to the pizza,
+  /// not to the "Large" variant specifically.
+  modifierGroups ModifierGroup[]
+
+  /// Promotions targeting this specific product (Discount Engine).
+  promotions Promotion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([categoryId])
+}
+
+model ProductVariant {
+  id             String   @id @default(cuid())
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// e.g. "Small", "Large", "4 Pieces", "8 Pieces"
+  name           String
+  sku            String?  @unique
+  /// Money as Decimal (not Float) so currency never drifts on binary rounding.
+  price          Decimal
+  /// Optional MANUAL strikethrough "was" price. Purely visual — NEVER an input
+  /// to the discount math; it only shows when no live promotion applies.
+  compareAtPrice Decimal?
+  isAvailable    Boolean  @default(true)
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  /// Promotions targeting this specific variant (Discount Engine).
+  promotions Promotion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Modifiers — the restaurant engine
+//
+// A ModifierGroup is one question asked at add-to-cart time ("Choose your
+// Crust", "Extras", "Spice Level"); a ModifierOption is one answer, carrying a
+// signed price adjustment.
+//
+// PRICING CONTRACT (see .claude/rules/business-logic.md):
+//   lineUnit = roundMoney(resolvePrice(variant.price, promos, now).finalPrice
+//                         + Σ selected option.priceDelta)
+// Promotions discount the VARIANT BASE ONLY — a 50%-off pizza promotion must
+// never also halve the +30 stuffed-crust upcharge.
+//
+// SELECTION RULES are plain integer columns; Postgres cannot enforce "pick 1-3
+// from this group." Validate in the shared Zod schema AND again in placeOrder
+// against the freshly-read group rows.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ModifierGroup {
+  id   String @id @default(cuid())
+  /// Customer-facing question, e.g. "Choose your Crust" or "Extras".
+  name String
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// The customer MUST answer this group before the line can be added.
+  isRequired Boolean @default(false)
+  /// Minimum selections when answered. 0 = optional group.
+  minSelect  Int     @default(0)
+  /// Maximum selections. 1 = single-select (radio); > 1 = multi-select (checkbox).
+  maxSelect  Int     @default(1)
+
+  /// Ascending display position within the product's option list.
+  order Int @default(0)
+
+  options ModifierOption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, order])
+}
+
+model ModifierOption {
+  id   String @id @default(cuid())
+  /// e.g. "Stuffed Crust", "Extra Cheese", "No Onions", "Extra Hot"
+  name String
+
+  groupId String
+  group   ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  /// SIGNED adjustment added to the discounted variant price. 0 for free
+  /// choices ("No Onions"), positive for upsells (+30), negative if the
+  /// business ever discounts a downgrade. Decimal — it is money.
+  priceDelta Decimal @default(0)
+
+  /// Soft 86 switch — hide the option without deleting it (and without
+  /// orphaning the order history that references it).
+  isAvailable Boolean @default(true)
+
+  /// Ascending display position within its group.
+  order Int @default(0)
+
+  cartSelections  CartItemModifier[]
+  orderSelections OrderItemModifier[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([groupId, order])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reviews (admin-moderated)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Review {
+  id         String  @id @default(cuid())
+  rating     Int // 1–5, enforced in the server action
+  comment    String
+  /// Snapshot of the reviewer's display name at submission time.
+  authorName String
+  /// Moderation flag — reviews are hidden until an admin sets this true.
+  isApproved Boolean @default(false)
+
+  // Reviews are written only by authenticated users.
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  // One review per user per product — re-submission is a P2002, handled in
+  // the server action as "you've already reviewed this product".
+  @@unique([userId, productId])
+  @@index([productId])
+  @@index([isApproved])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cart & Orders
+//
+// CartItem / OrderItem link strictly to a ProductVariant id (price integrity).
+// NOTE: the WishlistItem model is DELETED — the wishlist feature is dead in
+// La Rotunda. Do not reintroduce it. See .claude/rules/frontend.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CartItem {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int            @default(1)
+
+  /// The sorted, comma-separated list of selected ModifierOption ids
+  /// (e.g. "cm3x9a1b2,cm7f4d8e0"), or "" when nothing is selected.
+  ///
+  /// WHY IT EXISTS: variantId alone is NOT a sufficient line identity once
+  /// modifiers exist — "Large + extra cheese" and "Large plain" share a
+  /// variantId but cost different amounts. Merging them charges the wrong
+  /// total. Sorting makes the signature order-independent, so the same
+  /// selection always produces the same string.
+  ///
+  /// DERIVED, NOT TRUSTED: the server recomputes it from the validated option
+  /// ids on every write. A client-supplied signature is never persisted.
+  modifierSignature String @default("")
+
+  modifiers CartItemModifier[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // The upsert key for cart sync. THREE parts — [userId, variantId] alone is
+  // the pre-modifier shape and is wrong here.
+  @@unique([userId, variantId, modifierSignature])
+  @@index([userId])
+  @@index([variantId])
+}
+
+/// A single option selected on a cart line. Carries NO snapshot — the cart is
+/// ephemeral and getDbCartAction re-resolves name/price on every read.
+model CartItemModifier {
+  id         String   @id @default(cuid())
+  cartItemId String
+  cartItem   CartItem @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+
+  optionId String
+  option   ModifierOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([cartItemId, optionId])
+  @@index([cartItemId])
+  @@index([optionId])
+}
+
+model Order {
+  id          String @id @default(cuid())
+  /// Human-friendly sequential number for staff / customers.
+  orderNumber Int    @unique @default(autoincrement())
+
+  // Optional: orders may be placed by guests.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  items OrderItem[]
+
+  // Money columns are Decimal so historical receipts never carry float drift.
+  // VAT is deliberately NOT stored — every receipt derives it as the residual
+  // max(0, totalAmount - subtotal - deliveryFee), so the breakdown always
+  // reconciles to the total.
+  subtotal    Decimal
+  deliveryFee Decimal @default(0)
+  totalAmount Decimal
+
+  status      OrderStatus       @default(PENDING)
+  fulfillment FulfillmentMethod @default(DELIVERY)
+
+  // DELIVERY → addressLine (required, enforced by checkoutSchema).
+  // PICKUP   → pickupBranch (human-readable label for the receipt).
+  addressLine  String?
+  pickupBranch String?
+
+  // Fulfilling branch — the unit of MANAGER RBAC. Nullable because an
+  // "Other Areas" delivery has no branch; unassigned orders are visible to
+  // ADMIN only (a MANAGER's queries are filtered to their own branchId).
+  // Stamped at checkout in placeOrder(), re-resolved against a real active row.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  customerName  String
+  customerPhone String
+  orderNotes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([branchId])
+  // Backs the per-phone PENDING throttle (≤ 3 simultaneous, COD fraud guard).
+  @@index([customerPhone, status])
+}
+
+model OrderItem {
+  id        String         @id @default(cuid())
+  orderId   String
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId String
+  // Restrict: a variant referenced by a placed order cannot be hard-deleted.
+  // updateProduct catches the P2003 post-commit and ARCHIVES the variant
+  // (isAvailable: false, sku: null) instead.
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  // Snapshot captured at purchase time. `unitPrice` is the ALREADY-DISCOUNTED
+  // base price, EXCLUDING modifier deltas — those live on OrderItemModifier so
+  // the receipt can itemize them. Line total is therefore
+  //   quantity * (unitPrice + Σ modifiers.priceDelta)
+  productName String
+  variantName String
+  unitPrice   Decimal
+  quantity    Int
+
+  modifiers OrderItemModifier[]
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+/// A single option selected on a placed order line, SNAPSHOTTED.
+///
+/// The FK is SetNull while ProductVariant → OrderItem is Restrict, and that
+/// asymmetry is deliberate: a restaurant retires "Extra Jalapeños" seasonally,
+/// and Restrict would make every ever-ordered option permanently undeletable.
+/// Because name + priceDelta are snapshotted here, the FK is not load-bearing
+/// for rendering — nulling it costs nothing a receipt can observe. The variant
+/// FK keeps Restrict because analytics rollups still read it.
+model OrderItemModifier {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  optionId String?
+  option   ModifierOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+
+  /// Snapshots — the receipt renders entirely from these.
+  groupName  String // "Choose your Crust" — lets the receipt group selections
+  name       String // "Stuffed Crust"
+  priceDelta Decimal // +30.00, as billed
+
+  @@unique([orderItemId, optionId])
+  @@index([orderItemId])
+  @@index([optionId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dine-in Menu (the in-restaurant digital price list)
+//
+// SEALED from the ordering catalogue above: no foreign key to Category,
+// Product, or ProductVariant, and deliberately no relation to Promotion or
+// ModifierGroup. This is a read-only price list for guests sitting in the
+// restaurant — it has no cart or order path. Never wire an Add-to-Cart button
+// onto a MenuItem.
+//
+//   MenuCategory.isFixedPrice → every item shares one price, so the storefront
+//   renders a name grid + a single unified price badge.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MenuCategory {
+  id           String  @id @default(cuid())
+  title        String
+  slug         String  @unique
+  /// Display order in both the storefront nav and the admin list (ascending).
+  order        Int     @default(0)
+  /// When true, all items share one price (grid presentation).
+  isFixedPrice Boolean @default(false)
+
+  items     MenuItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([order])
+}
+
+model MenuItem {
+  id    String  @id @default(cuid())
+  /// Item name — often Arabic (rendered RTL on the storefront).
+  name  String
+  price Decimal
+  /// Display order within its category (ascending).
+  order Int     @default(0)
+
+  categoryId String
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([order])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Discount Engine — Promotions
+//
+// A Promotion applies a discount (PERCENTAGE or FIXED_AMOUNT) over the window
+// [startDate, endDate]. It can target any mix of whole Categories, individual
+// Products, and specific ProductVariants through implicit many-to-many join
+// tables (Prisma manages _CategoryToPromotion, _ProductToPromotion and
+// _ProductVariantToPromotion automatically).
+//
+// "CHEAPEST WINS": when several live promotions apply, exactly ONE does — the
+// lowest final price. Promotions NEVER stack, and there is deliberately no
+// priority/exclusivity column. Don't add one.
+//
+// Promotions discount the VARIANT BASE PRICE ONLY — never a modifier delta.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Promotion {
+  id        String       @id @default(cuid())
+  name      String
+  type      DiscountType
+  /// PERCENTAGE → percent off; FIXED_AMOUNT → EGP off. Decimal for money-safety.
+  value     Decimal
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean      @default(true)
+
+  // Targets — a promotion may link to any combination of the three.
+  categories Category[]
+  products   Product[]
+  variants   ProductVariant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  // Backs livePromotionWhere(now): isActive && startDate <= now <= endDate.
+  @@index([isActive, startDate, endDate])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Store settings (admin-managed, single row)
+//
+// Global pricing knobs read by the checkout preview AND by placeOrder (the
+// authoritative pricing path). The table holds exactly ONE row with the fixed
+// id "store". Readers NEVER create it — a missing row is answered from frozen
+// in-memory defaults that must mirror the column defaults below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StoreSettings {
+  /// Fixed singleton id — always "store". Never create a second row.
+  id String @id @default("store")
+
+  /// VAT as a FRACTION (0.14 = 14%). The admin UI edits it as a percentage.
+  /// Deliberately Float — it is a rate/fraction, not a currency amount. This is
+  /// the ONE exception to "money is Decimal".
+  vatRate      Float   @default(0.14)
+  /// Master VAT switch — when false, no VAT is shown or charged anywhere.
+  isVatEnabled Boolean @default(true)
+
+  /// Delivery fee (EGP) for DELIVERY orders not routed to a branch
+  /// ("Other Areas" at checkout, or a branch that went inactive mid-order).
+  defaultDeliveryFee Decimal @default(35)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Storefront FAQ (admin-managed)
+// Rendered into both the accordion UI and the FAQPage JSON-LD used for SEO.
+// Content lives on the homepage ("/"), so mutations bust that route's ISR cache.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Faq {
+  id       String  @id @default(cuid())
+  /// e.g. "Do you deliver to my area?" or "How long does delivery take?"
+  question String
+  /// The answer body rendered inside the accordion panel.
+  answer   String
+  /// Ascending display position on the storefront (lower = earlier).
+  order    Int     @default(0)
+  /// Hidden from the storefront when false, without deleting the row.
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Storefront locations showcase (admin-managed)
+//
+// Powers the "Our Locations" homepage section — an editorial, display-only card
+// per physical restaurant. DELIBERATELY separate from the commerce `Branch`
+// model: Branch is the fulfillment/RBAC/delivery-fee/hours unit wired into
+// Orders and Users; Location carries only marketing copy + SEO metadata. There
+// is no foreign key between them and no cart/order path here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Location {
+  id          String  @id @default(cuid())
+  /// Category pill label, e.g. "Restaurant" or "Dine-in & Takeaway".
+  tag         String
+  /// Opening-hours line for DISPLAY, e.g. "11:00 AM - 3:00 AM". This is
+  /// marketing copy — the ENFORCED order window is Branch.openTime/closeTime.
+  hours       String
+  /// Headline for the card, e.g. "Downtown Branch".
+  title       String
+  /// Editorial paragraph describing the location.
+  description String
+  /// Card image URL (an UploadThing/absolute URL or a /public path).
+  imageUrl    String
+  /// City/area for the LocalBusiness JSON-LD `addressLocality`.
+  locality    String
+  /// schema.org LocalBusiness `@type` for the JSON-LD, e.g. "Restaurant" or
+  /// "FastFoodRestaurant". A plain content string.
+  type        String
+  /// Ascending display position on the storefront (lower = earlier).
+  order       Int     @default(0)
+  /// Hidden from the storefront when false, without deleting the row.
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Storefront navigation (admin-managed)
+//
+// Each row is just a label + an href, so an admin can point one at a Category,
+// a Product, an internal page, or an external/social URL — no schema coupling,
+// so a category rename can never silently 404 a footer link. The settings
+// action validates the URL shape server-side (must start with "/", "#", or
+// "http(s)://" — blocking javascript: hrefs).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FooterLink {
+  id       String  @id @default(cuid())
+  /// Display text, e.g. "Our Story" or "Instagram".
+  label    String
+  /// The href — an internal path ("/category/pizza") or an absolute URL.
+  url      String
+  /// Column heading this link renders under. Links sharing a group form one
+  /// nav column; a column's position follows its earliest-ordered link.
+  group    String  @default("Explore")
+  /// Ascending sort position (lower = earlier).
+  order    Int     @default(0)
+  /// Hidden from the storefront when false, without deleting the row.
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+}

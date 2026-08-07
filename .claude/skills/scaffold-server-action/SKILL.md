@@ -1,6 +1,6 @@
 ---
 name: scaffold-server-action
-description: Scaffold a new "use server" Server Action for the Ali Baba platform that follows the house contract — discriminated-union return, the correct auth gate, shared Zod validation, Prisma-error-code translation, and the revalidatePath fan-out. Use when adding any write/mutation to src/lib/actions/** or src/app/admin/products/actions.ts.
+description: Scaffold a new "use server" Server Action for the La Rotunda platform that follows the house contract — discriminated-union return, the correct auth gate, shared Zod validation, Prisma-error-code translation, and the revalidatePath fan-out. Use when adding any write/mutation to src/lib/actions/** or src/app/admin/products/actions.ts.
 ---
 
 # Scaffold a Server Action
