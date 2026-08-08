@@ -101,24 +101,6 @@ const PRODUCTS: readonly MenuProduct[] = [
     categoryId: "boxes",
   },
   {
-    id: "p1",
-    slug: "rotunda-bucket",
-    name: "Rotunda Bucket",
-    description: "Eight pieces, hand-breaded, original or hot.",
-    priceFrom: 420,
-    image: "https://images.unsplash.com/photo-1585325701956-60dd9c8553bc",
-    categoryId: "fried-chicken",
-  },
-  {
-    id: "p2",
-    slug: "chicken-strips",
-    name: "Chicken Strips",
-    description: "Five strips with your choice of dip.",
-    priceFrom: 185,
-    image: "https://images.unsplash.com/photo-1527477396000-e27163b481c2",
-    categoryId: "fried-chicken",
-  },
-  {
     id: "p3",
     slug: "classic-beef-burger",
     name: "Classic Beef Burger",
@@ -162,24 +144,6 @@ const PRODUCTS: readonly MenuProduct[] = [
     priceFrom: 155,
     image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af",
     categoryId: "sandwiches",
-  },
-  {
-    id: "p8",
-    slug: "grilled-chicken-wrap",
-    name: "Grilled Chicken Wrap",
-    description: "Charred chicken, garlic sauce, warm flatbread.",
-    priceFrom: 135,
-    image: "https://images.unsplash.com/photo-1509722747041-616f39b57569",
-    categoryId: "sandwiches",
-  },
-  {
-    id: "p9",
-    slug: "skin-on-fries",
-    name: "Skin-On Fries",
-    description: "Cut fresh daily, salted straight out of the fryer.",
-    priceFrom: 55,
-    image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877",
-    categoryId: "fries",
   },
   {
     id: "p10",
@@ -258,7 +222,7 @@ export function MenuGrid() {
                   "shrink-0 rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                   isActive
                     ? "border-primary bg-primary text-white"
-                    : "border-border text-foreground hover:border-primary hover:text-primary",
+                    : "border-border text-foreground hover:border-primary hover:text-primary"
                 )}
               >
                 {category.name}
@@ -268,8 +232,7 @@ export function MenuGrid() {
         </div>
 
         <p aria-live="polite" className="sr-only">
-          Showing {visible.length}{" "}
-          {visible.length === 1 ? "item" : "items"}.
+          Showing {visible.length} {visible.length === 1 ? "item" : "items"}.
         </p>
 
         {visible.length === 0 ? (
