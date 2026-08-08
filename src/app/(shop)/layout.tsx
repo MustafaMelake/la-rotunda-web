@@ -1,3 +1,5 @@
+import { Toaster } from "sonner";
+
 import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/layout/Navbar";
 
@@ -23,7 +25,10 @@ export default function ShopLayout({
       {/* TODO(la-rotunda): <CartSidebar /> · <CartSyncProvider> */}
       <main className="pt-[var(--nav-h)]">{children}</main>
       <Footer />
-      {/* TODO(la-rotunda): <Toaster /> from sonner */}
+      {/* Mounted here rather than the root layout, same reasoning as the Navbar:
+          /admin has its own shell. Every Server Action result in the storefront
+          reports through this. */}
+      <Toaster position="bottom-right" richColors closeButton />
     </>
   );
 }
