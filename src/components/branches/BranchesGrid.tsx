@@ -4,85 +4,22 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Bike, Clock, MapPin, Navigation, Phone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { BRANCHES } from "@/lib/mock/branches";
 import { fadeUp, staggerParent } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
- * Mirrors the real `Branch` model in prisma/schema.prisma.
+ * Branch rows come from `@/lib/mock/branches` — the same module the checkout fee
+ * line reads. `deliveryFee` is money, and a second copy of a money value drifts
+ * silently until the customer sees one figure here and another at the till.
  *
- * `address` and `phone` are `String?` there — nullable — so the card below has
- * to survive both being missing rather than assuming a string. `deliveryFee` is
- * a `Decimal`, which means `.toNumber()` on the server before it crosses the
- * RSC boundary; a raw Prisma Decimal will not serialise.
- *
- * There is deliberately NO map field: the schema stores no latitude, longitude
- * or embed URL. So "Get Directions" is derived from `address`, and a branch
- * without one simply doesn't get the button. If a real map pin is wanted, that
- * needs a migration, not a component change.
+ * `address` and `phone` are `String?` in the schema, so the card survives either
+ * being absent rather than assuming a string. There is deliberately NO map
+ * field — no latitude, longitude or embed URL — so "Get directions" is derived
+ * from `address`, and a branch without one gets no button. A real map pin needs
+ * a migration, not a component change.
  */
-type Branch = {
-  id: string;
-  slug: string;
-  name: string;
-  address: string | null;
-  phone: string | null;
-  /** "HH:mm", 24-hour, Africa/Cairo. */
-  openTime: string;
-  /** "HH:mm". May be EARLIER than openTime — see `wrapsPastMidnight`. */
-  closeTime: string;
-  /** Manual kill switch, independent of the clock. */
-  isAcceptingOrders: boolean;
-  /** EGP. Decimal in the schema. */
-  deliveryFee: number;
-};
 
-/** PLACEHOLDER branches — real addresses, phone numbers and fees needed. */
-const BRANCHES: readonly Branch[] = [
-  {
-    id: "br1",
-    slug: "menouf",
-    name: "Menouf",
-    address: "Gamal Abdel Nasser St, Menouf, Menofia Governorate",
-    phone: "+20 100 000 0001",
-    openTime: "11:00",
-    closeTime: "03:00",
-    isAcceptingOrders: true,
-    deliveryFee: 25,
-  },
-  {
-    id: "br2",
-    slug: "shebin-el-kom",
-    name: "Shebin El-Kom",
-    address: "Tahrir St, Shebin El-Kom, Menofia Governorate",
-    phone: "+20 100 000 0002",
-    openTime: "11:00",
-    closeTime: "02:00",
-    isAcceptingOrders: true,
-    deliveryFee: 35,
-  },
-  {
-    id: "br3",
-    slug: "ashmoun",
-    name: "Ashmoun",
-    address: "El-Geish St, Ashmoun, Menofia Governorate",
-    phone: "+20 100 000 0003",
-    openTime: "12:00",
-    closeTime: "02:30",
-    isAcceptingOrders: false,
-    deliveryFee: 35,
-  },
-  {
-    id: "br4",
-    slug: "sadat-city",
-    name: "Sadat City",
-    address: "Central Axis, Sadat City, Menofia Governorate",
-    phone: "+20 100 000 0004",
-    openTime: "11:00",
-    closeTime: "01:00",
-    isAcceptingOrders: true,
-    deliveryFee: 45,
-  },
-] as const;
 
 /**
  * True when closing time lands on the following calendar day (11:00 → 03:00).
