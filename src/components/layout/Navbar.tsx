@@ -9,7 +9,7 @@ import {
   useReducedMotion,
   useScroll,
 } from "framer-motion";
-import { Menu, ShoppingBag, X } from "lucide-react";
+import { Menu, ShoppingBag, ShoppingCart, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,22 @@ const NAV_LINKS = [
   { href: "/offers", label: "Offers" },
   { href: "/about", label: "About" },
 ] as const;
+
+/**
+ * Hardcoded to mock an active cart. Replace with the distinct-line count from
+ * the Zustand store once `src/lib/cart-store.ts` exists.
+ *
+ * Two things that mock hides and the real wiring must handle:
+ *  - Render NOTHING until the persisted store has hydrated. Reading it during
+ *    the first paint flashes 0 → 3, and on a statically cached shell a
+ *    server-rendered count would be another visitor's cart.
+ *  - The badge already handles 0 (hidden) and >99 (clamped), because a real
+ *    cart reaches both and an un-clamped count blows the pill apart.
+ */
+// Annotated `number`, not left to infer the literal `3`: without this the
+// compiler narrows it and rejects the pluralisation and clamp branches below as
+// unreachable — which they are today, but will not be once this is a live count.
+const CART_COUNT: number = 3;
 
 /**
  * Floating glass navbar.
@@ -97,7 +113,34 @@ export function Navbar() {
           ))}
         </ul>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          {/*
+            Visible at every width — it sits beside the hamburger on mobile,
+            where "Order now" is hidden. Distinct icon from the CTA on purpose:
+            two identical bags side by side read as one control.
+
+            The count lives in the accessible name, and the badge itself is
+            aria-hidden — otherwise a screen reader announces a bare "3" with no
+            indication of what it counts.
+          */}
+          <Link
+            href="/cart"
+            onClick={() => setOpen(false)}
+            aria-label={`Cart, ${CART_COUNT} item${CART_COUNT === 1 ? "" : "s"}`}
+            className="relative grid size-11 place-items-center rounded-full text-white transition duration-200 hover:scale-105 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red motion-reduce:transition-none motion-reduce:hover:scale-100"
+          >
+            <ShoppingCart className="size-5" />
+
+            {CART_COUNT > 0 ? (
+              <span
+                aria-hidden="true"
+                className="num absolute right-0.5 top-0.5 grid min-w-4 place-items-center rounded-full bg-brand-red px-1 py-0.5 text-[0.65rem] font-bold leading-none text-white ring-2 ring-black/70"
+              >
+                {CART_COUNT > 99 ? "99+" : CART_COUNT}
+              </span>
+            ) : null}
+          </Link>
+
           <Button asChild variant="brand" size="pill" className="hidden sm:inline-flex">
             <Link href="/menu">
               <ShoppingBag aria-hidden="true" />

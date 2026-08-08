@@ -35,6 +35,7 @@ type MenuProduct = {
 
 const CATEGORIES: readonly MenuCategory[] = [
   { id: "all", name: "All items" },
+  { id: "boxes", name: "Boxes & Offers" },
   { id: "fried-chicken", name: "Fried Chicken" },
   { id: "burgers", name: "Burgers" },
   { id: "pizza", name: "Pizza" },
@@ -43,25 +44,61 @@ const CATEGORIES: readonly MenuCategory[] = [
   { id: "drinks", name: "Drinks" },
 ] as const;
 
-/** PLACEHOLDER catalogue — names, copy and prices all need the client's real menu. */
+/**
+ * PLACEHOLDER catalogue — prices are invented and need the client's real menu.
+ *
+ * Two tiers of imagery here, and the difference matters:
+ *
+ *  - The `boxes` items point at real La Rotunda photography in `public/`. Their
+ *    names and descriptions are read off those photos, so card and image agree.
+ *  - Everything below them is stock. Every one of those URLs was checked for a
+ *    200 before it shipped, but they are generic food, not this kitchen's.
+ *
+ * Note the `public/` files are all promo composites with offer headlines burned
+ * into the pixels, which is why they are only used at card size for the combo
+ * they actually show. Pointing a single-item card ("Skin-On Fries") at one of
+ * them would put a poster reading "4 قطع دجاج + بيتزا فرايد" under the wrong
+ * label and price. Single-item shots are the gap to fill.
+ */
 const PRODUCTS: readonly MenuProduct[] = [
   {
-    id: "p1",
-    slug: "rotunda-bucket",
-    name: "Rotunda Bucket",
-    description: "Eight pieces, hand-breaded, original or hot.",
-    priceFrom: 420,
-    image: "https://images.unsplash.com/photo-1585325701956-60dd9c8553bc",
-    categoryId: "fried-chicken",
+    id: "b1",
+    slug: "mega-box",
+    name: "Mega Box",
+    description:
+      "Four pieces of chicken with a pizza fraid tray, fries, coleslaw and two dips.",
+    priceFrom: 545,
+    image: "/la-rotunda5.jpg",
+    categoryId: "boxes",
   },
   {
-    id: "p2",
-    slug: "chicken-strips",
-    name: "Chicken Strips",
-    description: "Five strips with your choice of dip.",
-    priceFrom: 185,
-    image: "https://images.unsplash.com/photo-1527477396000-e27163b481c2",
-    categoryId: "fried-chicken",
+    id: "b2",
+    slug: "triple-box",
+    name: "Triple Box",
+    description: "Three burgers, crinkle fries and a bucket of saucy wings.",
+    priceFrom: 495,
+    image: "/la-rotunda4.jpeg",
+    categoryId: "boxes",
+  },
+  {
+    id: "b3",
+    slug: "weekend-box",
+    name: "Weekend Box",
+    description:
+      "Nine pieces of broast, fries, two coleslaw, three rice cups and kaizer buns.",
+    priceFrom: 620,
+    image: "/la-rotunda1.jpeg",
+    categoryId: "boxes",
+  },
+  {
+    id: "b4",
+    slug: "triple-shish-crepe",
+    name: "Triple Shish Crepe",
+    description:
+      "Three crepes rolled with grilled chicken, garlic sauce and peppers.",
+    priceFrom: 285,
+    image: "/la-rotunda3.jpeg",
+    categoryId: "boxes",
   },
   {
     id: "p3",
@@ -107,24 +144,6 @@ const PRODUCTS: readonly MenuProduct[] = [
     priceFrom: 155,
     image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af",
     categoryId: "sandwiches",
-  },
-  {
-    id: "p8",
-    slug: "grilled-chicken-wrap",
-    name: "Grilled Chicken Wrap",
-    description: "Charred chicken, garlic sauce, warm flatbread.",
-    priceFrom: 135,
-    image: "https://images.unsplash.com/photo-1509722747041-616f39b57569",
-    categoryId: "sandwiches",
-  },
-  {
-    id: "p9",
-    slug: "skin-on-fries",
-    name: "Skin-On Fries",
-    description: "Cut fresh daily, salted straight out of the fryer.",
-    priceFrom: 55,
-    image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877",
-    categoryId: "fries",
   },
   {
     id: "p10",
@@ -203,7 +222,7 @@ export function MenuGrid() {
                   "shrink-0 rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                   isActive
                     ? "border-primary bg-primary text-white"
-                    : "border-border text-foreground hover:border-primary hover:text-primary",
+                    : "border-border text-foreground hover:border-primary hover:text-primary"
                 )}
               >
                 {category.name}
@@ -213,8 +232,7 @@ export function MenuGrid() {
         </div>
 
         <p aria-live="polite" className="sr-only">
-          Showing {visible.length}{" "}
-          {visible.length === 1 ? "item" : "items"}.
+          Showing {visible.length} {visible.length === 1 ? "item" : "items"}.
         </p>
 
         {visible.length === 0 ? (
