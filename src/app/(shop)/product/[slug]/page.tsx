@@ -18,6 +18,26 @@ import {
  */
 export const revalidate = 60;
 
+/**
+ * Any slug not returned by `generateStaticParams` 404s at the routing layer
+ * instead of rendering on demand.
+ *
+ * This is here to fix a rendering bug, not for caching. With the default
+ * (`true`), an unknown slug rendered on demand and hit `notFound()`, and Next
+ * resolved that boundary on the CLIENT — the server shipped an empty <body> and
+ * the page painted blank until hydration. Verified: the RSC payload named the
+ * 404 component but the HTML held nothing. Flipping this to `false` makes the
+ * 404 fully server-rendered, chrome and all.
+ *
+ * ⚠️ REVISIT WHEN THE CATALOGUE IS LIVE. With a real Prisma read,
+ * `generateStaticParams` is evaluated at build time, so `false` means a product
+ * added afterwards 404s until the next build — which defeats the point of the
+ * 60s ISR window above. The right end state is `true` plus a catalogue where
+ * nothing links to a slug that does not exist; today's mock links to eight that
+ * don't, which is what makes this visible at all.
+ */
+export const dynamicParams = false;
+
 /** Next 16: `params` is a Promise and must be awaited. */
 type PageProps = { params: Promise<{ slug: string }> };
 
