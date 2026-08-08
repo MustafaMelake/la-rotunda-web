@@ -3,8 +3,17 @@
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 
-/** Verified to load; pick the final frame by eye. */
-const HERO_IMAGE = "https://images.unsplash.com/photo-1553979459-d2229ba7433b";
+/**
+ * Local asset from `public/` — no remotePattern needed and no third-party
+ * round-trip. Chosen because it is the one creative shot on a red ground, so it
+ * blends into this section's red instead of sitting on it as a rectangle.
+ *
+ * Heads-up: like every file in `public/`, this is a promo composite with the
+ * offer headline burned into the pixels. `object-cover` crops toward the food
+ * and pushes most of that text out of frame, but a clean plate shot with no
+ * type in it would serve this slot far better.
+ */
+const HERO_IMAGE = "/la-rotunda2.jpeg";
 
 /**
  * Positions are hardcoded, never random. `Math.random()` here would produce
@@ -77,15 +86,18 @@ export function MenuHero() {
           transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
           className="relative aspect-[5/4] w-full lg:aspect-[4/3]"
         >
-          {/* `.feather-mask` fades the photo's edges into the red so an opaque
-              stock image reads as a cut-out. See globals.css. */}
+          {/* `.feather-mask` fades the photo's edges into the red so the plate
+              reads as a cut-out. See globals.css. A string path (rather than a
+              static import) carries no intrinsic dimensions, so `fill` is
+              required here — the parent supplies the aspect ratio. */}
           <Image
             src={HERO_IMAGE}
             alt=""
             fill
             preload
+            quality={90}
             sizes="(min-width: 1024px) 40rem, 90vw"
-            className="feather-mask object-contain"
+            className="feather-mask object-cover object-center"
           />
         </motion.div>
       </div>

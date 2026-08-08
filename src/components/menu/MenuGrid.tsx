@@ -35,6 +35,7 @@ type MenuProduct = {
 
 const CATEGORIES: readonly MenuCategory[] = [
   { id: "all", name: "All items" },
+  { id: "boxes", name: "Boxes & Offers" },
   { id: "fried-chicken", name: "Fried Chicken" },
   { id: "burgers", name: "Burgers" },
   { id: "pizza", name: "Pizza" },
@@ -43,8 +44,62 @@ const CATEGORIES: readonly MenuCategory[] = [
   { id: "drinks", name: "Drinks" },
 ] as const;
 
-/** PLACEHOLDER catalogue — names, copy and prices all need the client's real menu. */
+/**
+ * PLACEHOLDER catalogue — prices are invented and need the client's real menu.
+ *
+ * Two tiers of imagery here, and the difference matters:
+ *
+ *  - The `boxes` items point at real La Rotunda photography in `public/`. Their
+ *    names and descriptions are read off those photos, so card and image agree.
+ *  - Everything below them is stock. Every one of those URLs was checked for a
+ *    200 before it shipped, but they are generic food, not this kitchen's.
+ *
+ * Note the `public/` files are all promo composites with offer headlines burned
+ * into the pixels, which is why they are only used at card size for the combo
+ * they actually show. Pointing a single-item card ("Skin-On Fries") at one of
+ * them would put a poster reading "4 قطع دجاج + بيتزا فرايد" under the wrong
+ * label and price. Single-item shots are the gap to fill.
+ */
 const PRODUCTS: readonly MenuProduct[] = [
+  {
+    id: "b1",
+    slug: "mega-box",
+    name: "Mega Box",
+    description:
+      "Four pieces of chicken with a pizza fraid tray, fries, coleslaw and two dips.",
+    priceFrom: 545,
+    image: "/la-rotunda5.jpg",
+    categoryId: "boxes",
+  },
+  {
+    id: "b2",
+    slug: "triple-box",
+    name: "Triple Box",
+    description: "Three burgers, crinkle fries and a bucket of saucy wings.",
+    priceFrom: 495,
+    image: "/la-rotunda4.jpeg",
+    categoryId: "boxes",
+  },
+  {
+    id: "b3",
+    slug: "weekend-box",
+    name: "Weekend Box",
+    description:
+      "Nine pieces of broast, fries, two coleslaw, three rice cups and kaizer buns.",
+    priceFrom: 620,
+    image: "/la-rotunda1.jpeg",
+    categoryId: "boxes",
+  },
+  {
+    id: "b4",
+    slug: "triple-shish-crepe",
+    name: "Triple Shish Crepe",
+    description:
+      "Three crepes rolled with grilled chicken, garlic sauce and peppers.",
+    priceFrom: 285,
+    image: "/la-rotunda3.jpeg",
+    categoryId: "boxes",
+  },
   {
     id: "p1",
     slug: "rotunda-bucket",
